@@ -1,0 +1,152 @@
+const request = require('request');
+const csv = require("csvtojson");
+var jsonArray = ['batatas'];
+var dataString = 'batatas';
+let email = 'email';
+let Id = 0;
+let x = 0;
+var helpscoutContact = {
+  "firstName": " ",
+  "lastName": " ",
+  "organization": " ",
+  "jobTitle": " ",
+  "background": " ",
+  "address": {
+    "lines": [
+      " "
+    ],
+    "city": " ",
+    "state": " ",
+    "postalCode": " ",
+    "country": " "
+  },
+  "emails": [{
+    "value": " ",
+    "location": " "
+  }],
+  "phones": [{
+    "value": " ",
+    "location": "work"
+  }, ]
+};
+
+var headers = {
+  'Authorization': 'Basic REDACTED',
+  'Content-Type': 'application/json',
+  'cache-control': 'no-cache',
+  'reload': true
+};
+
+var optionsGet = {
+  url: encodeURI('https://api.helpscout.net/v1/customers.json?email=' + email),
+  headers: headers
+};
+
+var optionsUpdate = {
+  url: 'https://api.helpscout.net/v1/customers/' + Id + '.json',
+  method: 'PUT',
+  headers: headers,
+  body: dataString
+};
+
+var optionsInsert = {
+  url: 'https://api.helpscout.net/v1/customers.json',
+  method: 'POST',
+  headers: headers,
+  body: dataString
+};
+
+csv()
+  .fromFile('All_SCLHealth.csv')
+  .then((jsonObj) => {
+    jsonArray = jsonObj;
+    init(jsonArray);
+  });
+
+function makeMyContact() {
+  helpscoutContact.jobTitle = jsonArray[x].title;
+  helpscoutContact.background = jsonArray[x].fax;
+  helpscoutContact.firstName = jsonArray[x].firstName;
+  helpscoutContact.lastName = jsonArray[x].lastName;
+  helpscoutContact.organization = jsonArray[x].organization;
+  helpscoutContact.address.lines[0] = jsonArray[x].address;
+  helpscoutContact.address.city = jsonArray[x].city;
+  helpscoutContact.address.state = jsonArray[x].state;
+  helpscoutContact.address.postalCode = jsonArray[x].zip;
+  helpscoutContact.address.country = jsonArray[x].country;
+  helpscoutContact.emails[0].value = jsonArray[x].email;
+  helpscoutContact.phones[0].value = jsonArray[x].phone;
+}
+
+function init() {
+  makeMyContact(jsonArray[x]);
+  dataString = JSON.stringify(helpscoutContact);
+  optionsInsert.body = dataString;
+  optionsUpdate.body = dataString;
+  request(optionsInsert, callbackInsert);
+
+  function callbackInsert(error, response, bodyInsert) {
+    if (response.statusCode == 409) {
+      bodyInsert = JSON.parse(bodyInsert);
+      email = bodyInsert.validationErrors[0].value;
+      optionsGet.url = encodeURI('https://api.helpscout.net/v1/customers.json?email=' + email);
+      request(optionsGet, callbackGet);
+
+    } else if (response.statusCode == 429) {
+      setTimeout(function() {
+        console.log('waiting3secs');
+        init(jsonArray, x)
+      }, 3000)
+
+    } else {
+      console.log(response.statusCode + ' ' + 'callbackInsert function');
+      console.log(optionsInsert.body + ' ' + 'bodyInstert');
+      console.log(error)
+      countAndUpdate()
+    }
+  };
+
+  function callbackGet(error, response, bodyGet) {
+    if (response.statusCode == 429) {
+      setTimeout(function() {
+        console.log('waiting3secs');
+        init(jsonArray, x)
+      }, 3000)
+    } else {
+      bodyGet = JSON.parse(bodyGet);
+      Id = bodyGet.items[0].id;
+      optionsUpdate.url = 'https://api.helpscout.net/v1/customers/' + Id + '.json';
+      console.log(optionsUpdate.url);
+      console.log(optionsUpdate.body);
+
+      request(optionsUpdate, callbackUpdate);
+    }
+  };
+
+  function callbackUpdate(error, response, bodyUpdate) {
+    if (response.statusCode == 429) {
+      setTimeout(function() {
+        console.log('waiting3secs');
+        init(jsonArray, x)
+      }, 3000)
+    } else {
+
+      console.log('updating');
+      console.log(response.statusCode + ' ' + 'callbackUpdate function');
+      countAndUpdate()
+    };
+
+  };
+
+  function countAndUpdate() {
+    if (x == jsonArray.length - 1) {
+      console.log('done');
+      process.exit()
+    } else {
+      x = x + 1;
+      console.log(x)
+      init(jsonArray, x);
+    }
+  };
+
+};
