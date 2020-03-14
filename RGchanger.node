@@ -1,0 +1,100 @@
+const request = require("request");
+var ringGroups = ["plusone", "plusTwo"];
+var numberIdArray = ["57bb6abede4f8565ff029b5d", "580650172a116cf319000001"];
+var numberBody = [];
+var Cookie = 'REDACTED';
+var subdomain = 'REDACTED';
+var headers = {
+    'accept': 'application/json, text/javascript, */*; q=0.01',
+    'Cookie': Cookie,
+    'x-requested-with': 'XMLHttpRequest',
+};
+//string.split(",")
+var optionsGetNumber = {
+  method: 'GET',
+  url: 'https://REDACTED.REDACTED.com/phones/57bb6abede4f8565ff029b5d',
+  headers: headers
+};
+
+var optionsPutNumber = {
+  method: 'PUT',
+  url: 'https://REDACTED.REDACTED.com/phones/57bb6abede4f8565ff029b5d',
+  headers: headers,
+  body: [],
+  json: true
+};
+
+
+//callback function of GET numbers
+function callbackGetNumber(error, response, body) {
+  if(!error && response.statusCode == 200){
+    numberBody.push(JSON.parse(body))
+    console.log(response.statusCode);
+  } else if(response.statusCode == 403){
+    console.log(`cookie invalid or expired`)
+    process.exit(403);
+  } else {
+    console.log(`get callback error ${error}`)
+    process.exit(1);
+  };
+};
+
+//callback function of PUT numbers
+function callbackPutNumber(error, response, body) {
+  if(!error && (response.statusCode == 200 || response.statusCode ==204)){
+    console.log(response.body);
+    console.log(response.statusCode);
+  }else if(error){
+    console.log(`put callback error ${error}`);
+    process.exit(1);
+  } else if (response.statusCode == 403) {
+    console.log(` PUT cookie invalid or expired`)
+  } else {
+    console.log('PUT unknown error')
+    process.exit(1);
+
+  };
+};
+
+
+//GET's numbers corresponding to the ID's on the numberIdArray
+getAndCreateArray(numberIdArray);
+function getAndCreateArray (numberIdArray){
+for (x in numberIdArray){
+  optionsGetNumber.url = `https://${subdomain}.REDACTED.com/phones/${numberIdArray[x]}`
+  console.log(optionsGetNumber);
+  request(optionsGetNumber, callbackGetNumber);
+};
+
+
+//this function guarantees the numberBody array is fully populated before moving on to the PUT requests
+makeSureArrayIsComplete(numberIdArray, numberBody);
+  function makeSureArrayIsComplete(){
+  console.log(`entering makesure`);
+    if (numberBody.length === numberIdArray.length){
+      console.log(numberIdArray.length);
+      console.log(numberBody.length);
+      console.log(numberIdArray);
+      console.log(`looparraynext`);
+      loopArrayPut(numberBody);
+    }else{
+  console.log(`not yet numberBody length = ${numberBody.length}`);
+  setTimeout(makeSureArrayIsComplete, 3000, numberIdArray, numberBody);
+    };
+  };
+};
+
+//this loop goes trought the number bodys, makes the necessary changes to the
+//HTTP headers and body (adds ring groups), and calls the request(PUT)
+function loopArrayPut (numberBody){
+console.log('entering loop array');
+for (x in numberBody){
+  numberBody[x].tags = numberBody[x].tags.concat(ringGroups);
+  optionsPutNumber.url = `https://${subdomain}.REDACTED.com/phones/${numberBody[x]._id}`
+  optionsPutNumber.body = numberBody[x];
+  console.log(numberBody[x]);
+  request(optionsPutNumber, callbackPutNumber);
+  console.log(` ${numberBody[x]._id}  ${numberBody[x].tags}`);
+
+  };
+};
